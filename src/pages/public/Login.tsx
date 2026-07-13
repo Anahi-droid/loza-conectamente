@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Typography } from 'antd'; 
 import { MailOutlined, LockOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 const { Title, Text } = Typography;
@@ -88,7 +88,7 @@ const Login: React.FC = () => {
           </Form.Item>
 
           {/* Botón de Envío con indicador de carga */}
-          <Form.Item style={{ marginTop: 32, marginBottom: 0 }}>
+          <Form.Item style={{ marginTop: 32, marginBottom: 16 }}>
             <Button 
               type="primary" 
               htmlType="submit" 
@@ -99,6 +99,13 @@ const Login: React.FC = () => {
               Iniciar Sesión
             </Button>
           </Form.Item>
+
+          {/* Enlace dinámico a la pantalla de registro público */}
+          <div style={{ textAlign: 'center' }}>
+            <Text type="secondary">
+              ¿No tienes una cuenta? <Link to="/register">Regístrate aquí</Link>
+            </Text>
+          </div>
         </Form>
       </Card>
     </div>

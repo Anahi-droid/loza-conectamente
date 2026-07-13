@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Popconfirm, message, Card, Input, Typography } from 'antd';
+import { Table, Button, Space, Popconfirm, message, Card, Input, Typography, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import { pacientesService } from '../../services/pacientesService';
 import { useAuth } from '../../hooks/useAuth';
-import { Paciente } from '../../types';
+import { Paciente, PacienteFormData } from '../../types';
+import FormPaciente from '../../components/FormPaciente';
 
 const { Title } = Typography;
 
@@ -12,8 +13,12 @@ const Pacientes: React.FC = () => {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
+  
+  // Estados para el Modal y el paciente en edición
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [formLoading, setFormLoading] = useState<boolean>(false);
+  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
 
-  // 1. Consumo real de la API NestJS al cargar el módulo
   const cargarPacientes = async () => {
     setLoading(true);
     try {
@@ -31,12 +36,51 @@ const Pacientes: React.FC = () => {
     cargarPacientes();
   }, []);
 
-  // 2. Lógica para eliminar registros conectada al backend
+  // Abrir modal en modo edición cargando los datos correspondientes
+  const abrirEditar = (paciente: Paciente) => {
+    setPacienteSeleccionado(paciente);
+    setIsModalOpen(true);
+  };
+
+  // Abrir modal en modo creación
+  const abrirCrear = () => {
+    setPacienteSeleccionado(null);
+    setIsModalOpen(true);
+  };
+
+  // Procesar tanto Creación como Edición de forma dinámica
+  const handleFormSubmit = async (data: PacienteFormData) => {
+    setFormLoading(true);
+    try {
+      if (pacienteSeleccionado) {
+        // MODO EDICIÓN: PATCH /pacientes/:id
+        await pacientesService.update(pacienteSeleccionado.id, data);
+        message.success('Paciente actualizado de manera exitosa.');
+      } else {
+        // MODO CREACIÓN: POST /pacientes
+        await pacientesService.create(data);
+        message.success('Paciente registrado de manera exitosa.');
+      }
+      
+      setIsModalOpen(false);
+      setPacienteSeleccionado(null);
+      cargarPacientes();
+    } catch (error: any) {
+      console.error(error);
+      if (error.response && error.response.status === 409) {
+        message.error('El correo electrónico ya se encuentra registrado.');
+      } else {
+        message.error('Hubo un problema al guardar el registro en el servidor.');
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   const handleEliminar = async (id: string) => {
     try {
       await pacientesService.remove(id);
       message.success('Paciente eliminado correctamente.');
-      // Refrescar la tabla localmente
       setPacientes(pacientes.filter(p => p.id !== id));
     } catch (error) {
       console.error(error);
@@ -44,16 +88,14 @@ const Pacientes: React.FC = () => {
     }
   };
 
-  // 3. Control de Roles (Punto 8 de la guía)
   const esAdmin = user?.rol === 'ADMIN';
 
-  // 4. Configuración de Columnas para Ant Design Table
   const columns = [
     {
       title: 'Nombre Completo',
       key: 'nombreCompleto',
       render: (_: any, record: Paciente) => 
-        `${record.usuario?.nombre || 'Sin'} ${record.usuario?.apellido || 'Nombre'}`,
+        `${record.usuario?.nombre || ''} ${record.usuario?.apellido || ''}`,
     },
     {
       title: 'Correo Electrónico',
@@ -72,7 +114,6 @@ const Pacientes: React.FC = () => {
       key: 'motivoConsultaInicial',
       ellipsis: true,
     },
-    // Condición de permisos: Solo si es ADMIN se renderiza la columna de acciones CRUD
     ...(esAdmin
       ? [
           {
@@ -80,10 +121,11 @@ const Pacientes: React.FC = () => {
             key: 'acciones',
             render: (_: any, record: Paciente) => (
               <Space size="middle">
+                {/* Botón de edición conectado al estado */}
                 <Button 
                   type="text" 
                   icon={<EditOutlined style={{ color: '#1890ff' }} />} 
-                  onClick={() => message.info(`Editar paciente ID: ${record.id} (Próximo paso: Modal)`)}
+                  onClick={() => abrirEditar(record)}
                 />
                 <Popconfirm
                   title="¿Estás seguro de eliminar este paciente?"
@@ -93,11 +135,7 @@ const Pacientes: React.FC = () => {
                   cancelText="Cancelar"
                   okButtonProps={{ danger: true }}
                 >
-                  <Button 
-                    type="text" 
-                    danger 
-                    icon={<DeleteOutlined />} 
-                  />
+                  <Button type="text" danger icon={<DeleteOutlined />} />
                 </Popconfirm>
               </Space>
             ),
@@ -106,12 +144,29 @@ const Pacientes: React.FC = () => {
       : []),
   ];
 
-  // Filtro de búsqueda en tiempo real en memoria sobre los datos del backend
   const datosFiltrados = pacientes.filter(p => {
     const nombreCompleto = `${p.usuario?.nombre || ''} ${p.usuario?.apellido || ''}`.toLowerCase();
     const email = (p.usuario?.email || '').toLowerCase();
     return nombreCompleto.includes(searchText.toLowerCase()) || email.includes(searchText.toLowerCase());
   });
+
+  // Mapeamos los valores iniciales para React Hook Form si estamos editando
+  const obtenerValoresIniciales = (): Partial<PacienteFormData> | undefined => {
+    if (!pacienteSeleccionado) return undefined;
+    return {
+      nombre: pacienteSeleccionado.usuario?.nombre || '',
+      apellido: pacienteSeleccionado.usuario?.apellido || '',
+      email: pacienteSeleccionado.usuario?.email || '',
+      fechaNacimiento: pacienteSeleccionado.fechaNacimiento,
+      genero: pacienteSeleccionado.genero || '',
+      ocupacion: pacienteSeleccionado.ocupacion || '',
+      telefonoEmergencia: pacienteSeleccionado.telefonoEmergencia || '',
+      contactoEmergenciaNombre: pacienteSeleccionado.contactoEmergenciaNombre || '',
+      tipoSangre: pacienteSeleccionado.tipoSangre || '',
+      antecedentesMedicos: pacienteSeleccionado.antecedentesMedicos || '',
+      motivoConsultaInicial: pacienteSeleccionado.motivoConsultaInicial || '',
+    };
+  };
 
   return (
     <Card bordered={false}>
@@ -119,20 +174,18 @@ const Pacientes: React.FC = () => {
         <div>
           <Title level={3} style={{ margin: 0 }}>Gestión de Pacientes Clínicos</Title>
         </div>
-        {/* El botón de crear solo aparece visualmente si el rol es ADMIN */}
         {esAdmin && (
           <Button 
             type="primary" 
             icon={<PlusOutlined />} 
             size="large"
-            onClick={() => message.info('Próximo paso: Abrir Modal con formulario Zod')}
+            onClick={abrirCrear}
           >
             Nuevo Paciente
           </Button>
         )}
       </div>
 
-      {/* Barra de Búsqueda y Herramientas */}
       <div style={{ marginBottom: 16 }}>
         <Input
           placeholder="Buscar por nombre o correo..."
@@ -144,15 +197,32 @@ const Pacientes: React.FC = () => {
         />
       </div>
 
-      {/* Tabla Principal Responsiva con Paginación Integrada de Antd */}
       <Table 
         columns={columns} 
         dataSource={datosFiltrados} 
         rowKey="id" 
         loading={loading}
         pagination={{ pageSize: 8 }}
-        scroll={{ x: true }} // Hace la tabla responsive en dispositivos móviles (Punto 9)
+        scroll={{ x: true }}
       />
+
+      <Modal
+        title={pacienteSeleccionado ? "Modificar Registro de Paciente" : "Registrar Nuevo Paciente Médico"}
+        open={isModalOpen}
+        onCancel={() => !formLoading && setIsModalOpen(false)}
+        footer={null}
+        width={700}
+        destroyOnClose
+      >
+        <div style={{ marginTop: 20 }}>
+          {/* Inyectamos dinámicamente los valores si existen */}
+          <FormPaciente 
+            onSubmit={handleFormSubmit} 
+            loading={formLoading} 
+            initialValues={obtenerValoresIniciales()} 
+          />
+        </div>
+      </Modal>
     </Card>
   );
 };
