@@ -1,33 +1,43 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import ProtectedRoute from './ProtectedRoute';
-import DashboardLayout from '../layouts/DashboardLayout';
-
-import Home from '../pages/public/Home';
 import Login from '../pages/public/Login';
+import Register from '../pages/public/Register';
 import Dashboard from '../pages/admin/Dashboard';
 import Pacientes from '../pages/admin/Pacientes';
+import Psicologos from '../pages/admin/Psicologos'; // 🚀 Importamos tu nueva pantalla
+import ProtectedRoute from './ProtectedRoute';
+import DashboardLayout from '../layouts/DashboardLayout';
 
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      {/* Rutas Públicas */}
-      <Route path="/" element={<Home />} />
+      {/* --- RUTAS PÚBLICAS --- */}
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-      {/* Rutas Privadas Protegidas bajo el DashboardLayout */}
+      {/* --- RUTAS PRIVADAS COMPARTIDAS --- */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          
-          {/* Rutas con restricción de rol */}
-          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'PSICOLOGO']} />}>
-            <Route path="/dashboard/pacientes" element={<Pacientes />} />
-          </Route>
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* --- RUTAS PRIVADAS COMPARTIDAS (ADMIN / PSICOLOGO) --- */}
+      <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'PSICOLOGO']} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard/pacientes" element={<Pacientes />} />
+        </Route>
+      </Route>
+
+      {/* --- RUTAS PRIVADAS EXCLUSIVAS DE ADMINISTRACIÓN --- */}
+      <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard/psicologos" element={<Psicologos />} />
+        </Route>
+      </Route>
+
+      {/* Redirección por defecto si entran a una ruta inexistente */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 };

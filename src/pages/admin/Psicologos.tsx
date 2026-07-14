@@ -1,76 +1,77 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Space, Popconfirm, message, Card, Input, Typography, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
-import { pacientesService } from '../../services/pacientesService';
+import { psicologosService } from '../../services/psicologosService';
 import { useAuth } from '../../hooks/useAuth';
-import { Paciente, PacienteFormData } from '../../types';
-import FormPaciente from '../../components/FormPaciente';
+import { Psicologo, PsicologoFormData } from '../../types';
+import FormPsicologo from '../../components/FormPsicologo';
 
 const { Title } = Typography;
 
-const Pacientes: React.FC = () => {
+const Psicologos: React.FC = () => {
   const { user } = useAuth();
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [psicologos, setPsicologos] = useState<Psicologo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
   
-  // Estados para el Modal y el paciente en edición
+  // Estados para el Modal y el psicólogo en edición
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [formLoading, setFormLoading] = useState<boolean>(false);
-  const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
+  const [psicologoSeleccionado, setPsicologoSeleccionado] = useState<Psicologo | null>(null);
 
-  const cargarPacientes = async () => {
+  const cargarPsicologos = async () => {
     setLoading(true);
     try {
-      const data = await pacientesService.getAll();
-      setPacientes(data);
+      const data = await psicologosService.getAll();
+      setPsicologos(data);
     } catch (error) {
       console.error(error);
-      message.error('Error al cargar el listado de pacientes desde el servidor.');
+      message.error('Error al cargar el listado de psicólogos desde el servidor.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    cargarPacientes();
+    cargarPsicologos();
   }, []);
 
-  // Abrir modal en modo edición cargando los datos correspondientes
-  const abrirEditar = (paciente: Paciente) => {
-    setPacienteSeleccionado(paciente);
+  const abrirEditar = (psicologo: Psicologo) => {
+    setPsicologoSeleccionado(psicologo);
     setIsModalOpen(true);
   };
 
-  // Abrir modal en modo creación
   const abrirCrear = () => {
-    setPacienteSeleccionado(null);
+    setPsicologoSeleccionado(null);
     setIsModalOpen(true);
   };
 
-  // Procesar tanto Creación como Edición de forma dinámica
-  const handleFormSubmit = async (data: PacienteFormData) => {
+  const handleFormSubmit = async (data: PsicologoFormData) => {
     setFormLoading(true);
     try {
-      if (pacienteSeleccionado) {
-        // MODO EDICIÓN: PATCH /pacientes/:id
-        await pacientesService.update(pacienteSeleccionado.id, data);
-        message.success('Paciente actualizado de manera exitosa.');
+      if (psicologoSeleccionado) {
+        // MODO EDICIÓN
+        await psicologosService.update(psicologoSeleccionado.id, data);
+        message.success('Perfil de psicólogo actualizado correctamente.');
       } else {
-        // MODO CREACIÓN: POST /pacientes
-        await pacientesService.create(data);
-        message.success('Paciente registrado de manera exitosa.');
+        // MODO CREACIÓN (El backend procesa la creación del usuario y del perfil en un solo paso)
+        await psicologosService.create(data);
+        message.success('Psicólogo registrado y cuenta asignada con éxito.');
       }
       
+      // Cerramos el modal de inmediato
       setIsModalOpen(false);
-      setPacienteSeleccionado(null);
-      cargarPacientes();
+      setPsicologoSeleccionado(null);
+      
+      // Forzamos la actualización inmediata de la tabla pidiendo los datos actualizados al servidor
+      await cargarPsicologos();
+
     } catch (error: any) {
       console.error(error);
       if (error.response && error.response.status === 409) {
-        message.error('El correo electrónico ya se encuentra registrado.');
+        message.error('Este correo electrónico ya está en uso por otro usuario.');
       } else {
-        message.error('Hubo un problema al guardar el registro en el servidor.');
+        message.error('Error al intentar guardar el registro en el servidor.');
       }
     } finally {
       setFormLoading(false);
@@ -79,12 +80,13 @@ const Pacientes: React.FC = () => {
 
   const handleEliminar = async (id: string) => {
     try {
-      await pacientesService.remove(id);
-      message.success('Paciente eliminado correctamente.');
-      setPacientes(pacientes.filter(p => p.id !== id));
+      await psicologosService.remove(id);
+      message.success('Psicólogo eliminado correctamente.');
+      // Actualización reactiva instantánea para no requerir llamada de red
+      setPsicologos(psicologos.filter(p => p.id !== id));
     } catch (error) {
       console.error(error);
-      message.error('No se pudo eliminar el registro.');
+      message.error('No se pudo procesar la eliminación en el servidor.');
     }
   };
 
@@ -94,7 +96,7 @@ const Pacientes: React.FC = () => {
     {
       title: 'Nombre Completo',
       key: 'nombreCompleto',
-      render: (_: any, record: Paciente) => 
+      render: (_: any, record: Psicologo) => 
         `${record.usuario?.nombre || ''} ${record.usuario?.apellido || ''}`,
     },
     {
@@ -103,33 +105,30 @@ const Pacientes: React.FC = () => {
       key: 'email',
     },
     {
-      title: 'Género',
-      dataIndex: 'genero',
-      key: 'genero',
-      render: (text: string) => text || 'No especificado',
+      title: 'Especialidad',
+      dataIndex: 'especialidad',
+      key: 'especialidad',
     },
     {
-      title: 'Motivo de Consulta',
-      dataIndex: 'motivoConsultaInicial',
-      key: 'motivoConsultaInicial',
-      ellipsis: true,
+      title: 'Reg. Profesional / Licencia',
+      dataIndex: 'licenciaProfesional',
+      key: 'licenciaProfesional',
     },
     ...(esAdmin
       ? [
           {
             title: 'Acciones',
             key: 'acciones',
-            render: (_: any, record: Paciente) => (
+            render: (_: any, record: Psicologo) => (
               <Space size="middle">
-                {/* Botón de edición conectado al estado */}
                 <Button 
                   type="text" 
                   icon={<EditOutlined style={{ color: '#1890ff' }} />} 
                   onClick={() => abrirEditar(record)}
                 />
                 <Popconfirm
-                  title="¿Estás seguro de eliminar este paciente?"
-                  description="Esta acción no se puede deshacer."
+                  title="¿Estás seguro de eliminar este profesional?"
+                  description="Se inhabilitará su acceso al sistema."
                   onConfirm={() => handleEliminar(record.id)}
                   okText="Sí, eliminar"
                   cancelText="Cancelar"
@@ -144,35 +143,29 @@ const Pacientes: React.FC = () => {
       : []),
   ];
 
-  const datosFiltrados = pacientes.filter(p => {
+  const datosFiltrados = psicologos.filter(p => {
     const nombreCompleto = `${p.usuario?.nombre || ''} ${p.usuario?.apellido || ''}`.toLowerCase();
     const email = (p.usuario?.email || '').toLowerCase();
     return nombreCompleto.includes(searchText.toLowerCase()) || email.includes(searchText.toLowerCase());
   });
 
-  // Mapeamos los valores iniciales para React Hook Form si estamos editando
-  const obtenerValoresIniciales = (): Partial<PacienteFormData> | undefined => {
-    if (!pacienteSeleccionado) return undefined;
+  const obtenerValoresIniciales = (): Partial<PsicologoFormData> | undefined => {
+    if (!psicologoSeleccionado) return undefined;
     return {
-      nombre: pacienteSeleccionado.usuario?.nombre || '',
-      apellido: pacienteSeleccionado.usuario?.apellido || '',
-      email: pacienteSeleccionado.usuario?.email || '',
-      fechaNacimiento: pacienteSeleccionado.fechaNacimiento,
-      genero: pacienteSeleccionado.genero || '',
-      ocupacion: pacienteSeleccionado.ocupacion || '',
-      telefonoEmergencia: pacienteSeleccionado.telefonoEmergencia || '',
-      contactoEmergenciaNombre: pacienteSeleccionado.contactoEmergenciaNombre || '',
-      tipoSangre: pacienteSeleccionado.tipoSangre || '',
-      antecedentesMedicos: pacienteSeleccionado.antecedentesMedicos || '',
-      motivoConsultaInicial: pacienteSeleccionado.motivoConsultaInicial || '',
+      nombre: psicologoSeleccionado.usuario?.nombre || '',
+      apellido: psicologoSeleccionado.usuario?.apellido || '',
+      email: psicologoSeleccionado.usuario?.email || '',
+      especialidad: psicologoSeleccionado.especialidad || '',
+      licenciaProfesional: psicologoSeleccionado.licenciaProfesional || '',
+      telefono: psicologoSeleccionado.telefono || '',
     };
   };
 
   return (
-    <Card bordered={false}>
+    <Card variant="borderless">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>Gestión de Pacientes Clínicos</Title>
+          <Title level={3} style={{ margin: 0 }}>Gestión de Psicólogos Clínicos</Title>
         </div>
         {esAdmin && (
           <Button 
@@ -181,18 +174,18 @@ const Pacientes: React.FC = () => {
             size="large"
             onClick={abrirCrear}
           >
-            Nuevo Paciente
+            Nuevo Psicólogo
           </Button>
         )}
       </div>
 
       <div style={{ marginBottom: 16 }}>
         <Input
-          placeholder="Buscar por nombre o correo..."
+          placeholder="Buscar por nombre o correo profesional..."
           prefix={<SearchOutlined style={{ color: 'rgba(0,0,0,0.25)' }} />}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 300 }}
+          style={{ width: 320 }}
           allowClear
         />
       </div>
@@ -207,7 +200,7 @@ const Pacientes: React.FC = () => {
       />
 
       <Modal
-        title={pacienteSeleccionado ? "Modificar Registro de Paciente" : "Registrar Nuevo Paciente Médico"}
+        title={psicologoSeleccionado ? "Modificar Perfil de Psicólogo" : "Registrar Nuevo Especialista Clínico"}
         open={isModalOpen}
         onCancel={() => !formLoading && setIsModalOpen(false)}
         footer={null}
@@ -215,8 +208,7 @@ const Pacientes: React.FC = () => {
         destroyOnClose
       >
         <div style={{ marginTop: 20 }}>
-          {/* Inyectamos dinámicamente los valores si existen */}
-          <FormPaciente 
+          <FormPsicologo 
             onSubmit={handleFormSubmit} 
             loading={formLoading} 
             initialValues={obtenerValoresIniciales()} 
@@ -227,4 +219,4 @@ const Pacientes: React.FC = () => {
   );
 };
 
-export default Pacientes;
+export default Psicologos;
