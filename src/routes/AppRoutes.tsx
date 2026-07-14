@@ -4,6 +4,7 @@ import Login from '../pages/public/Login';
 import Register from '../pages/public/Register';
 import Dashboard from '../pages/admin/Dashboard';
 import Pacientes from '../pages/admin/Pacientes';
+import Psicologos from '../pages/admin/Psicologos'; // 🚀 Importamos tu nueva pantalla
 import ProtectedRoute from './ProtectedRoute';
 import DashboardLayout from '../layouts/DashboardLayout';
 
@@ -21,10 +22,17 @@ const AppRoutes: React.FC = () => {
         </Route>
       </Route>
 
-      {/* --- RUTAS PRIVADAS EXCLUSIVAS (ADMIN / PSICOLOGO) --- */}
+      {/* --- RUTAS PRIVADAS COMPARTIDAS (ADMIN / PSICOLOGO) --- */}
       <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'PSICOLOGO']} />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard/pacientes" element={<Pacientes />} />
+        </Route>
+      </Route>
+
+      {/* --- RUTAS PRIVADAS EXCLUSIVAS DE ADMINISTRACIÓN --- */}
+      <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard/psicologos" element={<Psicologos />} />
         </Route>
       </Route>
 
